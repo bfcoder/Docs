@@ -26,6 +26,13 @@ hostnamectl
 apt update 
 apt install apache2
 ```
+
+# Install Fail2ban
+```
+apt update
+apt install fail2ban
+```
+
 # Install certbot 
 ```
 apt install software-properties-common
@@ -46,14 +53,14 @@ Copy paths of key and cert:
 Jitsi meet will ask you to fill them while installing 
 # Install lua and dependencies
 
-Enter in sudo user
+Become sudo user
 
 ```bash
 sudo su
 ```
 
 Run the follow script to install lua and her dependencies, and prosody with fixes.
-After finish, VM will be restarted
+After finish, VM will need to be restarted
 ```bash
 cd &&
 apt update -y &&
@@ -82,19 +89,19 @@ apt-get update -y &&
 apt-get upgrade -y &&
 apt-get install prosody -y &&
 chown root:prosody /etc/prosody/certs/localhost.key &&
-chmod 644 /etc/prosody/certs/localhost.key &&
-sleep 2 &&
-shutdown -r now
+chmod 644 /etc/prosody/certs/localhost.key
 ```
+
+Now reboot the machine
 
 # Install jitsi-meet
 
-Enter in sudo user
+After reboot, become sudo user
 ```bash
 sudo su
 ```
 
-After reboot, run the following commands:
+and run the following commands:
 ```
 wget -qO - https://download.jitsi.org/jitsi-key.gpg.key |  apt-key add - &&
 sh -c "echo 'deb https://download.jitsi.org stable/' > /etc/apt/sources.list.d/jitsi-stable.list" &&
@@ -102,6 +109,20 @@ apt update
 apt install jitsi-meet
 apt-get install jitsi-meet-tokens 
 ```
+
+Now to give the videobridge a better password (the default is 8 characters... :barf:)
+Run
+```
+prosodyctl passwd jvb@auth.[YOUR DOMAIN]
+```
+And enter new strong password at the prompts.
+
+
+For videobridge only machines, add source and install:
+```bash
+apt install jitsi-videobridge2
+```
+
 # Open necessary ports
 
 Enable ufw 
@@ -236,15 +257,102 @@ TO
 JVB_HOST=[YOUR DOMAIN]
 ```
 
+Replace
+```
+JVB_SECRET=
+```
+with your new password
+```
+JVB_SECRET=[NEW PASSWORD]
+```
+
 And add after `JAVA_SYS_PROPS`
 ```
 JAVA_SYS_PROPS=...
 AUTHBIND=yes
 ```
 
+### Edit sip-communicator in `/etc/jitsi/videobridge/sip-communicator.properties`
+
+Replace
+```
+org.jitsi.videobridge.xmpp.user.shard.PASSWORD=[ORIGINAL PASSWORD]
+```
+with
+```
+org.jitsi.videobridge.xmpp.user.shard.PASSWORD=[NEW PASSWORD]
+```
+
 Then, restart all services
 ```bash
 systemctl restart apache2 prosody jicofo jitsi-videobridge2
+```
+
+### For videobridge only machines, edit sip-communicator in `/etc/jitsi/videobridge/sip-communicator.properties`
+
+Add to the top of the file:
+```
+org.jitsi.videobridge.AUTHORIZED_SOURCE_REGEXP=jvbbrewery@internal.auth.[YOUR DOMAIN]/focus.*$
+```
+
+Replace
+```
+org.jitsi.videobridge.xmpp.user.shard.HOSTNAME=localhost
+```
+with
+```
+org.jitsi.videobridge.xmpp.user.shard.HOSTNAME=[INTERNAL IP ADDRESS OF MEET SERVER]
+```
+Replace
+```
+org.jitsi.videobridge.xmpp.user.shard.PASSWORD=[GENERATED PASSWORD]
+```
+with
+```
+org.jitsi.videobridge.xmpp.user.shard.PASSWORD=[PASSWORD IN THE MEET SERVER SIP PROPERTIES]
+```
+
+If you will be running video bridges from the this same machine template,
+then you must have a unique MUC_NICKNAME. The hostname will usually do as it is
+often the ip address of the machine. Optionally replace
+```
+org.jitsi.videobridge.xmpp.user.shard.MUC_NICKNAME=[UUID]
+```
+with
+```
+org.jitsi.videobridge.xmpp.user.shard.MUC_NICKNAME=$HOSTNAME
+```
+
+Add this to the bottom of the file
+```
+org.jitsi.videobridge.xmpp.user.shard.DISABLE_CERTIFICATE_VERIFICATION=true
+```
+
+### For videobridge only machines, edit videobridge config in `/etc/jitsi/videobridge/config`
+
+Leave `JVB_HOST` empty
+```
+JVB_HOST=
+```
+
+Replace
+```
+JVB_SECRET=
+```
+with your new password
+```
+JVB_SECRET=[NEW PASSWORD]
+```
+
+And add after `JAVA_SYS_PROPS`
+```
+JAVA_SYS_PROPS=...
+AUTHBIND=yes
+```
+
+Then, restart the videobridge service
+```bash
+systemctl restart jitsi-videobridge2
 ```
 
 # Setup jigasi for sip call
